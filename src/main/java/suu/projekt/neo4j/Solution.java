@@ -25,26 +25,6 @@ public class Solution extends AbstractSolution {
         executeQuery(findMovieRecommendationForUser("Wayne Smith"), this::movieDataExtractor);
     }
 
-    private void executeQuery(final String query, Function<Record, String> dataExtractor) {
-        System.out.println("Executing query: " + query);
-        StatementResult result = session.run(query);
-        while (result.hasNext()) {
-            System.out.println(dataExtractor.apply(result.next()));
-        }
-    }
-
-    private String databaseStatisticsExtractor(Record record) {
-        return record.toString();
-    }
-
-    private String actorNameExtractor(Record record) {
-        return record.get("a").get("name").toString();
-    }
-
-    private String movieDataExtractor(Record record) {
-        return String.format("%s (%s)", record.get("m").get("title"), record.get("m").get("year"));
-    }
-
     private String findActorByName(final String actorName) {
         return "MATCH (a:Actor) WHERE a.name CONTAINS \"" + actorName + "\" RETURN a LIMIT 50";
     }
