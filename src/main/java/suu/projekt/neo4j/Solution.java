@@ -1,7 +1,10 @@
 package suu.projekt.neo4j;
 
+import org.neo4j.driver.v1.Record;
 import org.neo4j.driver.v1.Session;
 import org.neo4j.driver.v1.StatementResult;
+
+import java.util.function.Function;
 
 public class Solution extends AbstractSolution {
 
@@ -10,67 +13,61 @@ public class Solution extends AbstractSolution {
     }
 
     public void databaseStatistics() {
-        StatementResult res1 = session.run("CALL db.labels()");
-        while (res1.hasNext()) {
-            System.out.println(res1.next());
-        }
-        StatementResult res2 = session.run("CALL db.relationshipTypes()");
-        while (res2.hasNext()) {
-            System.out.println(res2.next());
-        }
+        executeQuery("CALL db.labels()", this::databaseStatisticsExtractor);
+        executeQuery("CALL db.relationshipTypes()", this::databaseStatisticsExtractor);
     }
 
     public void runAllTests() {
-        findActorByName("Emma Watson");
-        findMovieByTitleLike("Star Wars");
-        findRatedMoviesForUser("maheshksp");
-        findCommonMoviesForActors("Emma Watson", "Daniel Radcliffe");
-        findMovieRecommendationForUser("emileifrem");
+        executeQuery(findActorByName("Emma Watson"), this::actorNameExtractor);
+        executeQuery(findMovieByTitleLike("Star Wars"), this::movieDataExtractor);
+        executeQuery(findRatedMoviesForUser("Wayne Smith"), this::movieDataExtractor);
+        executeQuery(findCommonMoviesForActors("Brad Pitt", "Angelina Jolie"), this::movieDataExtractor);
+        executeQuery(findMovieRecommendationForUser("Wayne Smith"), this::movieDataExtractor);
     }
 
-    private void findActorByName(final String actorName) {
-        StatementResult res = session.run("MATCH (a:Actor) WHERE a.name CONTAINS \"" + actorName + "\" RETURN a LIMIT 50");
-        while (res.hasNext()) {
-            System.out.println(res.next().get("a").get("name"));
+    private void executeQuery(final String query, Function<Record, String> dataExtractor) {
+        System.out.println("Executing query: " + query);
+        StatementResult result = session.run(query);
+        while (result.hasNext()) {
+            System.out.println(dataExtractor.apply(result.next()));
         }
     }
 
-    private void findMovieByTitleLike(final String movieName) {
-        StatementResult res = session.run("MATCH (m:Movie) WHERE m.title CONTAINS \"" + movieName + "\" RETURN m LIMIT 50");
-        while (res.hasNext()) {
-            System.out.println(res.next().get("m").keys());
-        }
+    private String databaseStatisticsExtractor(Record record) {
+        return record.toString();
     }
 
-    private void findRatedMoviesForUser(final String userLogin) {
-        StatementResult res = session.run("MATCH (m:Movie)<-[:RATED]-(u:User) WHERE u.name CONTAINS \"" + userLogin + "\" RETURN m LIMIT 50");
-        while (res.hasNext()) {
-            System.out.println(res.next().get("m").keys());
-        }
+    private String actorNameExtractor(Record record) {
+        return record.get("a").get("name").toString();
     }
 
-    private void findCommonMoviesForActors(String actorOne, String actorTwo) {
-        String query = "MATCH (a1:Actor)-[:ACTED_IN]->(m:Movie)<-[:ACTED_IN]-(a2:Actor) WHERE a1.name CONTAINS \"" +
+    private String movieDataExtractor(Record record) {
+        return String.format("%s (%s)", record.get("m").get("title"), record.get("m").get("year"));
+    }
+
+    private String findActorByName(final String actorName) {
+        return "MATCH (a:Actor) WHERE a.name CONTAINS \"" + actorName + "\" RETURN a LIMIT 50";
+    }
+
+    private String findMovieByTitleLike(final String movieName) {
+        return "MATCH (m:Movie) WHERE m.title CONTAINS \"" + movieName + "\" RETURN m LIMIT 50";
+    }
+
+    private String findRatedMoviesForUser(final String userName) {
+        return "MATCH (m:Movie)<-[:RATED]-(u:User) WHERE u.name CONTAINS \"" + userName + "\" RETURN m LIMIT 10";
+    }
+
+    private String findCommonMoviesForActors(String actorOne, String actorTwo) {
+        return "MATCH (a1:Actor)-[:ACTED_IN]->(m:Movie)<-[:ACTED_IN]-(a2:Actor) WHERE a1.name CONTAINS \"" +
                 actorOne + "\" AND a2.name CONTAINS \"" + actorTwo + "\" RETURN m";
-
-        StatementResult res = session.run(query);
-        while (res.hasNext()) {
-            System.out.println(res.next().get("m").keys());
-        }
     }
 
-    private void findMovieRecommendationForUser(final String userLogin) {
-        String query = "MATCH (u1:User)-[rate:RATED]->(:Movie)<-[:RATED]-(u2:User)-[:RATED]->(another:Movie) " +
+    private String findMovieRecommendationForUser(final String userLogin) {
+        return "MATCH (u1:User)-[rate:RATED]->(:Movie)<-[:RATED]-(u2:User)-[:RATED]->(m:Movie) " +
                 "WHERE u1.name CONTAINS \"" + userLogin +
-                "\" WITH another, u1, u2, count(rate) as Times " +
+                "\" WITH m, u1, u2, count(rate) as Times " +
                 "WHERE Times > 3 " +
-                "RETURN u1, u2, another " +
+                "RETURN u1, u2, m " +
                 "LIMIT 50";
-
-        StatementResult res = session.run(query);
-        while (res.hasNext()) {
-            System.out.println(res.next().get("u1").keys());
-        }
     }
-
 }
